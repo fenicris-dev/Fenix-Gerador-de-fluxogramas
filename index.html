@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FNX-FLU — Gerador de Fluxogramas v1.0.0</title>
+  <style>
+    :root {
+      --fnx-primary: #d97706;
+      --fnx-primary-dark: #b45309;
+      --fnx-bg: #0f172a;
+      --fnx-panel: #1e293b;
+      --fnx-panel-hover: #334155;
+      --fnx-border: #475569;
+      --fnx-text: #f8fafc;
+      --fnx-text-muted: #94a3b8;
+      --node-start: #10b981;
+      --node-process: #2563eb;
+      --node-decision: #f59e0b;
+      --node-doc: #8b5cf6;
+      --node-sub: #06b6d4;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--fnx-bg);
+      color: var(--fnx-text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Barra Superior */
+    header {
+      background: var(--fnx-panel);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--fnx-border);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .badge {
+      background: var(--fnx-primary);
+      color: #000;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .actions { display: flex; gap: 8px; align-items: center; }
+    button {
+      background: var(--fnx-panel-hover);
+      color: var(--fnx-text);
+      border: 1px solid var(--fnx-border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: 0.15s;
+    }
+    button:hover { background: var(--fnx-border); }
+    button.primary {
+      background: var(--fnx-primary);
+      color: #000;
+      border-color: var(--fnx-primary-dark);
+      font-weight: 700;
+    }
+    button.primary:hover { background: var(--fnx-primary-dark); color: #fff; }
+
+    /* Layout Central */
+    .main-container {
+      display: flex;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Barra Lateral */
+    aside {
+      width: 280px;
+      background: var(--fnx-panel);
+      border-right: 1px solid var(--fnx-border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 12px;
+      z-index: 5;
+      overflow-y: auto;
+    }
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      background: var(--fnx-bg);
+      padding: 4px;
+      border-radius: 8px;
+    }
+    .tab-nav button {
+      flex: 1;
+      padding: 5px 0;
+      font-size: 12px;
+      background: transparent;
+      border: none;
+    }
+    .tab-nav button.active {
+      background: var(--fnx-panel);
+      color: var(--fnx-primary);
+      font-weight: 700;
+    }
+    .tab-content { display: none; flex-direction: column; gap: 10px; }
+    .tab-content.active { display: flex; }
+
+    .node-palette {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .node-btn {
+      padding: 8px;
+      font-size: 12px;
+      text-align: center;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid var(--fnx-border);
+      background: var(--fnx-bg);
+    }
+    .node-btn:hover { border-color: var(--fnx-primary); }
+
+    textarea, input, select {
+      background: var(--fnx-bg);
+      border: 1px solid var(--fnx-border);
+      color: var(--fnx-text);
+      padding: 8px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      width: 100%;
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* Área de Desenho (Canvas) */
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      background: #090d16;
+      background-image: radial-gradient(var(--fnx-panel) 1px, transparent 1px);
+      background-size: 20px 20px;
+      overflow: hidden;
+      cursor: grab;
+    }
+    .canvas-container:active { cursor: grabbing; }
+    #canvas-viewport {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+      width: 5000px;
+      height: 5000px;
+    }
+    svg.connections-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* Estilos dos Nós */
+    .flow-node {
+      position: absolute;
+      min-width: 130px;
+      max-width: 220px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      cursor: move;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      user-select: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .flow-node.selected {
+      border-color: #fff;
+      box-shadow: 0 0 0 3px var(--fnx-primary);
+    }
+    .flow-node .label-sub {
+      font-size: 10px;
+      font-weight: normal;
+      color: #e2e8f0;
+      margin-top: 4px;
+    }
+
+    /* Formatos de Nós */
+    .node-start-end {
+      border-radius: 24px;
+      background: var(--node-start);
+    }
+    .node-process {
+      border-radius: 6px;
+      background: var(--node-process);
+    }
+    .node-decision {
+      background: var(--node-decision);
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+      width: 150px;
+      height: 90px;
+      padding: 20px 22px;
+    }
+    .node-document {
+      background: var(--node-doc);
+      border-radius: 4px 4px 16px 4px;
+    }
+    .node-subprocess {
+      background: var(--node-sub);
+      border: 2px dashed #fff;
+      border-radius: 6px;
+    }
+
+    /* Barra Inferior */
+    footer {
+      background: var(--fnx-panel);
+      border-top: 1px solid var(--fnx-border);
+      padding: 6px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--fnx-text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="badge">FÊNIX</span>
+      <span>FNX-FLU</span>
+      <span style="font-size: 12px; color: var(--fnx-text-muted)">v1.0.0</span>
+    </div>
+    <div class="actions">
+      <button onclick="autoLayout()">⚡ Auto-organizar</button>
+      <button onclick="clearCanvas()">🗑️ Limpar</button>
+      <button onclick="saveLocal()">💾 Salvar</button>
+      <button onclick="exportJSON()">📤 JSON</button>
+      <button class="primary" onclick="exportPNG()">📷 Exportar PNG</button>
+    </div>
+  </header>
+
+  <div class="main-container">
+    <aside>
+      <div class="tab-nav">
+        <button class="active" onclick="setTab('manual')">Manual</button>
+        <button onclick="setTab('prompt')">Prompt</button>
+        <button onclick="setTab('structured')">Etapas</button>
+      </div>
+
+      <!-- Tab Manual -->
+      <div id="tab-manual" class="tab-content active">
+        <span style="font-size: 12px; font-weight: 600; color: var(--fnx-text-muted);">ADICIONAR BLOCO</span>
+        <div class="node-palette">
+          <div class="node-btn" onclick="addNode('start', 'Início')">🟢 Início</div>
+          <div class="node-btn" onclick="addNode('process', 'Processo')">▭ Processo</div>
+          <div class="node-btn" onclick="addNode('decision', 'Decisão?')">◇ Decisão</div>
+          <div class="node-btn" onclick="addNode('document', 'Documento')">▱ Documento</div>
+          <div class="node-btn" onclick="addNode('subprocess', 'Subprocesso')">⚙️ Subprocesso</div>
+          <div class="node-btn" onclick="addNode('start', 'Fim')">🔴 Fim</div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--fnx-border); margin: 6px 0;">
+
+        <span style="font-size: 12px; font-weight: 600; color: var(--fnx-text-muted);">CONECTAR BLOCOS</span>
+        <input type="text" id="conn-from" placeholder="ID Origem (ex: 1)">
+        <input type="text" id="conn-to" placeholder="ID Destino (ex: 2)">
+        <input type="text" id="conn-label" placeholder="Rótulo (ex: Sim / Não)">
+        <button class="primary" onclick="addManualConnection()">Ligar Blocos</button>
+      </div>
+
+      <!-- Tab Prompt -->
+      <div id="tab-prompt" class="tab-content">
+        <span style="font-size: 12px; font-weight: 600; color: var(--fnx-text-muted);">FLUXO POR TEXTO</span>
+        <textarea id="prompt-input" rows="6" placeholder="Escreva o processo em texto simples ou separado por setas (->)..."></textarea>
+        <button class="primary" onclick="generateFromPrompt()">Gerar Fluxograma</button>
+        <button onclick="loadMotorExample()">Exemplo: Motor de Portão</button>
+      </div>
+
+      <!-- Tab Estruturada -->
+      <div id="tab-structured" class="tab-content">
+        <span style="font-size: 12px; font-weight: 600; color: var(--fnx-text-muted);">ETAPAS NUMERADAS</span>
+        <textarea id="structured-input" rows="7" placeholder="1: Início -> 2&#10;2: Diagnóstico -> 3&#10;3: Decisão? -> 4, 5&#10;4: Reparo -> 6&#10;5: Orçamento -> 6&#10;6: Fim"></textarea>
+        <button class="primary" onclick="generateFromStructured()">Processar Etapas</button>
+      </div>
+    </aside>
+
+    <div class="canvas-container" id="canvas-container">
+      <div id="canvas-viewport">
+        <svg class="connections-layer" id="svg-layer">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#f8fafc" />
+            </marker>
+          </defs>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div id="status-info">0 blocos | 0 conexões</div>
+    <div>Use o botão direito ou arraste o fundo para mover | Scroll para Zoom</div>
+  </footer>
+
+  <script>
+    // Estado da Aplicação
+    const state = {
+      nodes: [],
+      connections: [],
+      nextId: 1,
+      zoom: 1,
+      pan: { x: 40, y: 40 }
+    };
+
+    const viewport = document.getElementById("canvas-viewport");
+    const container = document.getElementById("canvas-container");
+    const svgLayer = document.getElementById("svg-layer");
+    const statusInfo = document.getElementById("status-info");
+
+    // Gerenciador de Abas
+    function setTab(name) {
+      document.querySelectorAll(".tab-nav button").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      event.target.classList.add("active");
+      document.getElementById("tab-" + name).classList.add("active");
+    }
+
+    // Criação de Nós
+    function addNode(type, text, x = 120, y = 100) {
+      const id = String(state.nextId++);
+      const node = { id, type, text, x, y };
+      state.nodes.push(node);
+      renderNode(node);
+      updateStatus();
+      return node;
+    }
+
+    function renderNode(node) {
+      const el = document.createElement("div");
+      el.id = "node-" + node.id;
+      el.className = "flow-node node-" + (node.type === "decision" ? "decision" : (node.type === "start" ? "start-end" : node.type));
+      el.style.left = node.x + "px";
+      el.style.top = node.y + "px";
+      el.innerHTML = `<span>${node.text}</span><span class="label-sub">#${node.id}</span>`;
+
+      // Eventos de Arrasto
+      let isDragging = false;
+      let startX, startY;
+
+      el.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        isDragging = true;
+        startX = e.clientX - node.x;
+        startY = e.clientY - node.y;
+        e.stopPropagation();
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        node.x = e.clientX - startX;
+        node.y = e.clientY - startY;
+        el.style.left = node.x + "px";
+        el.style.top = node.y + "px";
+        renderConnections();
+      });
+
+      window.addEventListener("mouseup", () => { isDragging = false; });
+      viewport.appendChild(el);
+    }
+
+    // Conexões
+    function addConnection(from, to, label = "") {
+      if (state.connections.some(c => c.from === from && c.to === to)) return;
+      state.connections.push({ from: String(from), to: String(to), label });
+      renderConnections();
+      updateStatus();
+    }
+
+    function addManualConnection() {
+      const from = document.getElementById("conn-from").value.trim();
+      const to = document.getElementById("conn-to").value.trim();
+      const label = document.getElementById("conn-label").value.trim();
+      if (!from || !to) return alert("Preencha origem e destino!");
+      addConnection(from, to, label);
+    }
+
+    function renderConnections() {
+      // Limpa linhas mantendo os defs/markers
+      const defs = svgLayer.querySelector("defs");
+      svgLayer.innerHTML = "";
+      svgLayer.appendChild(defs);
+
+      state.connections.forEach(conn => {
+        const fromNode = state.nodes.find(n => n.id === conn.from);
+        const toNode = state.nodes.find(n => n.id === conn.to);
+        if (!fromNode || !toNode) return;
+
+        const x1 = fromNode.x + 80;
+        const y1 = fromNode.y + 35;
+        const x2 = toNode.x + 80;
+        const y2 = toNode.y + 35;
+
+        // Linha com curva Bezier suave
+        const path = document.createElementNS("[w3.org](http://www.w3.org/2000/svg)", "path");
+        const midY = (y1 + y2) / 2;
+        const d = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+        path.setAttribute("d", d);
+        path.setAttribute("stroke", "#f8fafc");
+        path.setAttribute("stroke-width", "2");
+        path.setAttribute("fill", "none");
+        path.setAttribute("marker-end", "url(#arrow)");
+        svgLayer.appendChild(path);
+
+        if (conn.label) {
+          const text = document.createElementNS("[w3.org](http://www.w3.org/2000/svg)", "text");
+          text.setAttribute("x", (x1 + x2) / 2);
+          text.setAttribute("y", (y1 + y2) / 2 - 8);
+          text.setAttribute("fill", "#fbbf24");
+          text.setAttribute("font-size", "11px");
+          text.setAttribute("font-weight", "bold");
+          text.setAttribute("text-anchor", "middle");
+          text.textContent = conn.label;
+          svgLayer.appendChild(text);
+        }
+      });
+    }
+
+    // Auto-organizar (Distribuição Vertical)
+    function autoLayout() {
+      let currentY = 60;
+      state.nodes.forEach((node) => {
+        node.x = 220;
+        node.y = currentY;
+        currentY += 120;
+        const el = document.getElementById("node-" + node.id);
+        if (el) {
+          el.style.left = node.x + "px";
+          el.style.top = node.y + "px";
+        }
+      });
+      renderConnections();
+    }
+
+    // Gerador por Texto (Modo Prompt)
+    function generateFromPrompt() {
+      const text = document.getElementById("prompt-input").value;
+      if (!text) return;
+      clearCanvas();
+
+      // Quebra por "->", vírgulas ou palavras-chave "depois", "em seguida"
+      const steps = text.split(/->|,| depois | em seguida | e finalizar/i)
+                        .map(s => s.trim())
+                        .filter(s => s.length > 2);
+
+      let prevNode = null;
+      steps.forEach((step, idx) => {
+        let type = "process";
+        if (idx === 0) type = "start";
+        else if (idx === steps.length - 1) type = "start";
+        else if (step.includes("?")) type = "decision";
+
+        const node = addNode(type, step);
+        if (prevNode) {
+          addConnection(prevNode.id, node.id);
+        }
+        prevNode = node;
+      });
+
+      autoLayout();
+    }
+
+    // Exemplo Pré-definido
+    function loadMotorExample() {
+      document.getElementById("prompt-input").value = 
+        "Identificar modelo do motor -> Verificar se o portão está adequado? -> Medir alimentação -> Instalar motor -> Configurar fim de curso -> Cadastrar controles -> Testar funcionamento -> Finalizado";
+      generateFromPrompt();
+    }
+
+    // Modo Estruturado
+    function generateFromStructured() {
+      const raw = document.getElementById("structured-input").value.trim();
+      if (!raw) return;
+      clearCanvas();
+
+      const lines = raw.split("\n");
+      const connectionsToMake = [];
+
+      lines.forEach(line => {
+        const match = line.match(/^(\w+):\s*(.+?)(?:\s*->\s*(.+))?$/);
+        if (match) {
+          const [_, id, text, targets] = match;
+          const type = text.includes("?") ? "decision" : (id === "1" ? "start" : "process");
+          const n = addNode(type, text);
+          n.id = id;
+          document.getElementById("node-" + n.id).querySelector(".label-sub").textContent = "#" + id;
+
+          if (targets) {
+            targets.split(",").forEach(t => {
+              connectionsToMake.push({ from: id, to: t.trim() });
+            });
+          }
+        }
+      });
+
+      connectionsToMake.forEach(c => addConnection(c.from, c.to));
+      autoLayout();
+    }
+
+    // Limpar / Resetar
+    function clearCanvas() {
+      state.nodes = [];
+      state.connections = [];
+      state.nextId = 1;
+      document.querySelectorAll(".flow-node").forEach(el => el.remove());
+      renderConnections();
+      updateStatus();
+    }
+
+    function updateStatus() {
+      statusInfo.textContent = `${state.nodes.length} blocos | ${state.connections.length} conexões`;
+    }
+
+    // Persistência LocalStorage
+    function saveLocal() {
+      localStorage.setItem("fnx_flu_flow", JSON.stringify(state));
+      alert("Fluxograma salvo no navegador!");
+    }
+
+    function exportJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+      const a = document.createElement("a");
+      a.href = dataStr;
+      a.download = "fluxo-fenix.json";
+      a.click();
+    }
+
+    function exportPNG() {
+      alert("Dica: Use Ctrl+P (ou Cmd+P) e escolha 'Salvar como PDF/Imagem' para a versão com vetorização nativa!");
+    }
+
+    // Carregar automático se houver salvo
+    window.onload = () => {
+      const saved = localStorage.getItem("fnx_flu_flow");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          state.nodes = parsed.nodes || [];
+          state.connections = parsed.connections || [];
+          state.nextId = parsed.nextId || 1;
+          state.nodes.forEach(renderNode);
+          renderConnections();
+          updateStatus();
+        } catch(e) {}
+      }
+    };
+  </script>
+</body>
+</html>
