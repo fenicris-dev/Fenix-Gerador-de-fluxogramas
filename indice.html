@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FNX-FLU — Gerador de Fluxogramas v1.1</title>
+<style>
+:root{--pri:#d97706;--bg:#0f172a;--pan:#1e293b;--hov:#334155;--bd:#475569;--tx:#f8fafc;--mu:#94a3b8}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font:14px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);display:flex;flex-direction:column;overflow:hidden}
+header,footer{background:var(--pan);padding:8px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+header{border-bottom:1px solid var(--bd)}
+footer{border-top:1px solid var(--bd);font-size:12px;color:var(--mu);justify-content:space-between}
+.brand{font-weight:700;display:flex;gap:8px;align-items:center;margin-right:auto}
+.badge{background:var(--pri);color:#000;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:800}
+.ver{font-size:12px;color:var(--mu);font-weight:400}
+button{background:var(--hov);color:var(--tx);border:1px solid var(--bd);padding:6px 10px;border-radius:6px;cursor:pointer;font:inherit;font-size:13px}
+button:hover{background:var(--bd)}
+button.pri{background:var(--pri);color:#000;border-color:#b45309;font-weight:700}
+button.off{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--pri);outline-offset:1px}
+.menu{display:none}
+main{flex:1;display:flex;position:relative;min-height:0}
+aside{width:250px;background:var(--pan);border-right:1px solid var(--bd);padding:10px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;z-index:5}
+.tabs{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:8px}
+.tabs button{flex:1;background:transparent;border:0;padding:5px 0;font-size:12px}
+.tabs button.on{background:var(--pan);color:var(--pri);font-weight:700}
+.tab{display:none;flex-direction:column;gap:8px}.tab.on{display:flex}
+small{color:var(--mu);font-size:12px}
+#pal{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#pal button{text-align:center;padding:9px 4px;background:var(--bg)}
+#pal button:not(.off):hover{border-color:var(--pri)}
+textarea,input{background:var(--bg);border:1px solid var(--bd);color:var(--tx);padding:8px;border-radius:6px;font:inherit;width:100%}
+textarea{min-height:130px;resize:vertical}
+#pp{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--bd);padding-top:10px}
+#pp[hidden]{display:none}
+#pp label{font-size:12px;color:var(--mu)}
+.wrap{flex:1;position:relative;min-width:0}
+#cv{width:100%;height:100%;display:block;touch-action:none;cursor:grab;background:#090d16 radial-gradient(#1e293b 1px,transparent 1px) 0 0/20px 20px}
+#guia{position:absolute;top:10px;left:50%;transform:translateX(-50%);max-width:92%;background:rgba(15,23,42,.92);border:1px solid var(--pri);padding:6px 12px;border-radius:999px;font-size:13px;pointer-events:none;text-align:center}
+#tip{position:fixed;z-index:20;max-width:230px;background:#020617;border:1px solid var(--pri);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.4;pointer-events:none;display:none}
+#tip em{color:#fbbf24;font-style:normal}
+#toast{position:fixed;bottom:48px;left:50%;transform:translateX(-50%);background:var(--pri);color:#000;font-weight:600;padding:8px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30;max-width:90%}
+#toast.show{opacity:1}
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:4px}
+@media(max-width:720px){
+ .menu{display:inline-block}
+ aside{position:absolute;top:0;bottom:0;left:0;transform:translateX(-100%);transition:transform .2s;box-shadow:4px 0 16px rgba(0,0,0,.5)}
+ aside.open{transform:none}
+ .hint{display:none}
+}
+@media(prefers-reduced-motion:reduce){aside,#toast{transition:none}}
+</style>
+</head>
+<body>
+<header>
+ <button class="menu" id="mnu" aria-label="Abrir blocos">☰</button>
+ <div class="brand"><span class="badge">FÊNIX</span><span>FNX-FLU</span><span class="ver">v1.1</span></div>
+ <button id="und" title="Desfazer (Ctrl+Z)">↶</button>
+ <button id="red" title="Refazer (Ctrl+Y)">↷</button>
+ <button id="lnk" title="Liga o bloco selecionado a outro bloco">🔗 Ligar</button>
+ <button id="lay" title="Organiza o fluxo em camadas">⚡ Organizar</button>
+ <button id="exJ">📤 JSON</button>
+ <button id="imJ">📥 Importar</button>
+ <button id="exS">SVG</button>
+ <button id="exP" class="pri">📷 PNG</button>
+ <button id="clr">🗑️</button>
+ <input type="file" id="fil" accept=".json,application/json" hidden>
+</header>
+<main>
+ <aside id="aside">
+  <div class="tabs">
+   <button class="on" data-tab="m">Manual</button>
+   <button data-tab="p">Prompt</button>
+   <button data-tab="e">Etapas</button>
+  </div>
+  <div id="t-m" class="tab on">
+   <small>Adicionar bloco. Com um bloco selecionado, o novo já entra ligado a ele.</small>
+   <div id="pal"></div>
+  </div>
+  <div id="t-p" class="tab">
+   <small>Descreva o processo separando por vírgulas, setas (->) ou "depois". Perguntas viram decisões com SIM e NÃO.</small>
+   <textarea id="pin" placeholder="Receber cliente, fazer diagnóstico, verificar se o problema foi resolvido, finalizar"></textarea>
+   <button class="pri" id="bp">Gerar fluxograma</button>
+   <button id="bx">Exemplo: motor de portão</button>
+  </div>
+  <div id="t-e" class="tab">
+   <small>Uma etapa por linha. Em decisões, use 4:SIM, 5:NÃO.</small>
+   <textarea id="sin" placeholder="1: Início -> 2&#10;2: Fazer diagnóstico -> 3&#10;3: Problema identificado? -> 4:SIM, 5:NÃO&#10;4: Executar reparo -> 6&#10;5: Solicitar orçamento -> 6&#10;6: Fim"></textarea>
+   <button class="pri" id="be">Gerar fluxograma</button>
+  </div>
+  <div id="pp" hidden>
+   <label id="plb" for="ptx">Nome do bloco</label>
+   <input id="ptx" autocomplete="off">
+   <button id="pdel">🗑️ Excluir selecionado</button>
+  </div>
+ </aside>
+ <div class="wrap">
+  <svg id="cv" xmlns="http://www.w3.org/2000/svg">
+   <defs id="defs"><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#cbd5e1"/></marker></defs>
+   <g id="world"><g id="edges"></g><g id="nodes"></g></g>
+  </svg>
+  <div id="guia"></div>
+  <div class="zoom"><button id="zi" aria-label="Aproximar">+</button><button id="zo" aria-label="Afastar">−</button><button id="zf" aria-label="Ajustar" title="Ajustar à tela">⤢</button></div>
+ </div>
+</main>
+<footer><span id="st"></span><span class="hint">Arraste o fundo para mover · roda do mouse dá zoom · duplo clique renomeia · Delete exclui</span></footer>
+<div id="tip"></div><div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s),NS='http://www.w3.org/2000/svg',K='fnx_flu_v1_1';
+const T={
+ start:{n:'Início',ic:'🟢',c:'#10b981',w:140,h:48,ex:'Ponto de partida do fluxo. Ex.: Solicitação recebida.'},
+ process:{n:'Processo',ic:'▭',c:'#2563eb',w:160,h:56,ex:'Uma ação ou etapa. Ex.: Medir a alimentação.'},
+ decision:{n:'Decisão',ic:'◇',c:'#f59e0b',tc:'#1f1300',w:180,h:96,ex:'Pergunta com dois caminhos. Ex.: O equipamento liga? → SIM / NÃO.'},
+ document:{n:'Documento',ic:'▱',c:'#8b5cf6',w:160,h:56,ex:'Registro ou papel gerado. Ex.: Ordem de serviço.'},
+ sub:{n:'Subprocesso',ic:'⚙️',c:'#06b6d4',w:170,h:56,ex:'Detalha um processo que tem fluxo próprio. Ex.: Cadastrar controles.'},
+ end:{n:'Fim',ic:'🔴',c:'#ef4444',w:140,h:48,ex:'Encerra o fluxo. Ex.: Atendimento finalizado.'}
+};
+const S={nodes:[],edges:[],nid:1,z:1,px:40,py:40,sel:null,link:false};
+let hist=[],fut=[],drag=null,pan=null,last={id:0,t:0};
+const node=id=>S.nodes.find(n=>n.id===id),out=id=>S.edges.filter(e=>e.a===id),has=t=>S.nodes.some(n=>n.t===t);
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const snap=()=>JSON.stringify({nodes:S.nodes,edges:S.edges,nid:S.nid});
+function commit(){hist.push(snap());if(hist.length>60)hist.shift();fut=[]}
+function load(s){const o=JSON.parse(s);S.nodes=o.nodes||[];S.edges=o.edges||[];S.nid=o.nid||S.nodes.length+S.edges.length+1;S.sel=null;draw()}
+function undo(){if(!hist.length)return;fut.push(snap());load(hist.pop())}
+function redo(){if(!fut.length)return;hist.push(snap());load(fut.pop())}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('show'),2600)}
+
+/* Regras: o que pode ser criado agora */
+function rule(t){
+ if(t==='start')return has('start')?'Este fluxo já tem um Início.':'';
+ if(!has('start'))return 'Comece criando o Início.';
+ if(t==='sub'&&!has('process'))return 'Crie um Processo antes: o subprocesso depende dele.';
+ if(t==='end'&&S.nodes.length<2)return 'Adicione ao menos um bloco antes do Fim.';
+ return '';
+}
+function guide(){
+ if(!S.nodes.length)return 'Comece criando o Início.';
+ const n=S.sel&&S.sel.k==='n'?node(S.sel.id):null;
+ if(n){
+  const o=out(n.id).length;
+  if(n.t==='end')return 'O Fim encerra o fluxo: nada vem depois dele.';
+  if(n.t==='decision')return o<2?`Decisão precisa de dois caminhos (${o}/2): adicione o ${o?'NÃO':'SIM'}.`:'Decisão completa: SIM e NÃO definidos.';
+  return 'Próximo: Processo, Decisão, Documento'+(has('process')?', Subprocesso':'')+' ou Fim.';
+ }
+ const l=S.nodes.find(x=>x.t!=='end'&&!out(x.id).length);
+ if(l)return `"${l.tx}" está sem saída. Selecione-o e adicione o próximo bloco.`;
+ return has('end')?'Fluxo completo. Selecione um bloco para continuar.':'Falta o Fim.';
+}
+
+/* Criação */
+function add(t,tx,x,y){const n={id:String(S.nid++),t,tx:tx||T[t].n,x,y};S.nodes.push(n);return n}
+function linkNodes(a,b,l){
+ if(a===b||S.edges.some(e=>e.a===a&&e.b===b))return;
+ const A=node(a),k=out(a).length;
+ if(l===undefined)l=A&&A.t==='decision'?(k===0?'SIM':k===1?'NÃO':''):'';
+ S.edges.push({id:'e'+S.nid++,a,b,l});
+}
+function fromPalette(t){
+ const r=rule(t);if(r)return toast(r);
+ commit();
+ const p=S.sel&&S.sel.k==='n'?node(S.sel.id):null,ok=p&&p.t!=='end';
+ let x=200,y=S.nodes.length?Math.max(...S.nodes.map(n=>n.y))+130:80;
+ if(ok){const k=out(p.id).length;x=p.x+k*200;y=p.y+130}
+ const n=add(t,null,x,y);
+ if(ok&&t!=='start')linkNodes(p.id,n.id);
+ S.sel={k:'n',id:n.id};
+ draw();vis(n);
+ $('#aside').classList.remove('open');
+}
+function vis(n){const r=$('#cv').getBoundingClientRect(),sx=n.x*S.z+S.px,sy=n.y*S.z+S.py;if(S.nodes.length<=1||sx<60||sy<60||sx>r.width-60||sy>r.height-60)fit()}
+function reset(){S.nodes=[];S.edges=[];S.nid=1;S.sel=null;S.link=false}
+
+/* Desenho em SVG */
+function el(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function wrap(s,n){const l=[''];s.split(/\s+/).forEach(w=>{const c=l[l.length-1];if(c&&(c+' '+w).length>n)l.push(w);else l[l.length-1]=(c+' '+w).trim()});return l.slice(0,3)}
+function shape(n,g){
+ const {w,h,c}=T[n.t],a={fill:c,stroke:'#fff','stroke-width':1};
+ if(n.t==='decision')return el('polygon',{points:`0,${-h/2} ${w/2},0 0,${h/2} ${-w/2},0`,...a},g);
+ if(n.t==='start'||n.t==='end')return el('rect',{x:-w/2,y:-h/2,width:w,height:h,rx:h/2,...a},g);
+ if(n.t==='document')return el('path',{d:`M${-w/2} ${-h/2}H${w/2}V${h/2-10}Q${w/4} ${h/2-22} 0 ${h/2-10}T${-w/2} ${h/2-10}Z`,...a},g);
+ return el('rect',{x:-w/2,y:-h/2,width:w,height:h,rx:6,...a,...(n.t==='sub'?{'stroke-dasharray':'5 3','stroke-width':2}:{})},g);
+}
+function draw(){
+ const gn=$('#nodes'),ge=$('#edges');gn.textContent='';ge.textContent='';
+ S.edges.forEach(e=>{
+  const a=node(e.a),b=node(e.b);if(!a||!b)return;
+  const x1=a.x,y1=a.y+T[a.t].h/2,x2=b.x,y2=b.y-T[b.t].h/2,back=y2<=y1+10,m=(y1+y2)/2;
+  const d=back?`M${x1} ${y1}C${x1+140} ${y1+60} ${x2+140} ${y2-60} ${x2} ${y2}`:`M${x1} ${y1}C${x1} ${m} ${x2} ${m} ${x2} ${y2}`;
+  const sel=S.sel&&S.sel.k==='e'&&S.sel.id===e.id,g=el('g',{},ge);
+  el('path',{d,fill:'none',stroke:sel?'#d97706':'#cbd5e1','stroke-width':sel?3:2,'marker-end':'url(#ar)'},g);
+  el('path',{d,fill:'none',stroke:'transparent','stroke-width':14,style:'cursor:pointer'},g).onpointerdown=ev=>{ev.stopPropagation();pick('e',e.id)};
+  if(e.l){const t=el('text',{x:back?(x1+x2)/2+105:(x1+x2)/2,y:m-6,fill:'#fbbf24',stroke:'#0f172a','stroke-width':4,'paint-order':'stroke','font-size':12,'font-weight':700,'font-family':'system-ui,sans-serif','text-anchor':'middle'},g);t.textContent=e.l}
+ });
+ S.nodes.forEach(n=>{
+  const g=el('g',{transform:`translate(${n.x} ${n.y})`,style:'cursor:move'},gn),s=shape(n,g);
+  if(S.sel&&S.sel.k==='n'&&S.sel.id===n.id){s.setAttribute('stroke','#d97706');s.setAttribute('stroke-width',4)}
+  const l=wrap(n.tx,n.t==='decision'?14:22),t=el('text',{fill:T[n.t].tc||'#fff','font-size':12,'font-weight':600,'font-family':'system-ui,sans-serif','text-anchor':'middle'},g);
+  l.forEach((q,i)=>{el('tspan',{x:0,dy:i?14:-(l.length-1)*7+4},t).textContent=q});
+  g.onpointerdown=ev=>nodeDown(ev,n);
+ });
+ try{localStorage.setItem(K,snap())}catch(e){}
+ refresh();
+}
+function refresh(){
+ document.querySelectorAll('#pal button').forEach(b=>{const r=rule(b.dataset.t);b.classList.toggle('off',!!r);b.dataset.r=r});
+ const s=S.sel,n=s&&s.k==='n'?node(s.id):null,e=s&&s.k==='e'?S.edges.find(x=>x.id===s.id):null;
+ $('#pp').hidden=!(n||e);
+ $('#plb').textContent=n?'Nome do bloco':'Rótulo da seta';
+ if(document.activeElement!==$('#ptx'))$('#ptx').value=n?n.tx:e?e.l:'';
+ $('#guia').textContent=guide();
+ $('#st').textContent=`${S.nodes.length} blocos | ${S.edges.length} conexões | ${Math.round(S.z*100)}% | salvo automaticamente`;
+ $('#lnk').classList.toggle('pri',S.link);
+ $('#und').classList.toggle('off',!hist.length);$('#red').classList.toggle('off',!fut.length);
+}
+function pick(k,id){S.sel=k?{k,id}:null;if(document.activeElement)document.activeElement.blur();draw()}
+function view(){$('#world').setAttribute('transform',`translate(${S.px} ${S.py}) scale(${S.z})`);refresh()}
+function bb(){const xs=S.nodes.map(n=>n.x),ys=S.nodes.map(n=>n.y);return[Math.min(...xs)-110,Math.min(...ys)-70,Math.max(...xs)+170,Math.max(...ys)+70]}
+function fit(){
+ if(!S.nodes.length){S.z=1;S.px=40;S.py=40;return view()}
+ const r=$('#cv').getBoundingClientRect(),[x0,y0,x1,y1]=bb();
+ S.z=Math.min(1,r.width/(x1-x0),r.height/(y1-y0));
+ S.px=(r.width-(x1-x0)*S.z)/2-x0*S.z;S.py=(r.height-(y1-y0)*S.z)/2-y0*S.z;view();
+}
+
+/* Interação */
+const cv=$('#cv');
+function pt(ev){const r=cv.getBoundingClientRect();return{x:(ev.clientX-r.left-S.px)/S.z,y:(ev.clientY-r.top-S.py)/S.z}}
+function nodeDown(ev,n){
+ ev.stopPropagation();
+ if(S.link&&S.sel&&S.sel.k==='n'&&S.sel.id!==n.id){commit();linkNodes(S.sel.id,n.id);S.link=false;return pick('n',n.id)}
+ const now=Date.now(),dbl=last.id===n.id&&now-last.t<350;last={id:n.id,t:now};
+ pick('n',n.id);
+ if(dbl){$('#ptx').focus();$('#ptx').select();return}
+ const p=pt(ev);drag={n,dx:n.x-p.x,dy:n.y-p.y,moved:false,snap:snap()};
+ cv.setPointerCapture(ev.pointerId);
+}
+cv.onpointerdown=ev=>{S.link=false;pick(null);pan={x:ev.clientX-S.px,y:ev.clientY-S.py};cv.setPointerCapture(ev.pointerId)};
+cv.onpointermove=ev=>{
+ if(drag){
+  const p=pt(ev),nx=Math.round((p.x+drag.dx)/10)*10,ny=Math.round((p.y+drag.dy)/10)*10;
+  if(nx!==drag.n.x||ny!==drag.n.y){if(!drag.moved){hist.push(drag.snap);fut=[];drag.moved=true}drag.n.x=nx;drag.n.y=ny;draw()}
+ }else if(pan){S.px=ev.clientX-pan.x;S.py=ev.clientY-pan.y;view()}
+};
+cv.onpointerup=cv.onpointercancel=()=>{drag=null;pan=null};
+function zoomAt(f,mx,my){const z=Math.max(.2,Math.min(2.5,S.z*f)),k=z/S.z;S.px=mx-(mx-S.px)*k;S.py=my-(my-S.py)*k;S.z=z;view()}
+cv.addEventListener('wheel',ev=>{ev.preventDefault();const r=cv.getBoundingClientRect();zoomAt(ev.deltaY<0?1.1:.9,ev.clientX-r.left,ev.clientY-r.top)},{passive:false});
+$('#zi').onclick=()=>{const r=cv.getBoundingClientRect();zoomAt(1.2,r.width/2,r.height/2)};
+$('#zo').onclick=()=>{const r=cv.getBoundingClientRect();zoomAt(1/1.2,r.width/2,r.height/2)};
+$('#zf').onclick=fit;
+$('#ptx').oninput=ev=>{
+ const s=S.sel;if(!s)return;
+ if(s.k==='n')node(s.id).tx=ev.target.value||T[node(s.id).t].n;else S.edges.find(e=>e.id===s.id).l=ev.target.value;
+ draw();
+};
+$('#ptx').onfocus=commit;
+$('#ptx').onkeydown=ev=>{if(ev.key==='Enter'||ev.key==='Escape')ev.target.blur()};
+function del(){
+ const s=S.sel;if(!s)return;commit();
+ if(s.k==='n'){S.nodes=S.nodes.filter(n=>n.id!==s.id);S.edges=S.edges.filter(e=>e.a!==s.id&&e.b!==s.id)}
+ else S.edges=S.edges.filter(e=>e.id!==s.id);
+ S.sel=null;draw();
+}
+$('#pdel').onclick=del;
+document.addEventListener('keydown',ev=>{
+ if(['INPUT','TEXTAREA'].includes(document.activeElement.tagName))return;
+ if(ev.key==='Delete'||ev.key==='Backspace'){ev.preventDefault();del()}
+ else if(ev.key==='Escape'){S.link=false;pick(null)}
+ else if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='z'){ev.preventDefault();ev.shiftKey?redo():undo()}
+ else if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='y'){ev.preventDefault();redo()}
+});
+$('#und').onclick=undo;$('#red').onclick=redo;
+$('#lnk').onclick=()=>{
+ const n=S.sel&&S.sel.k==='n'?node(S.sel.id):null;
+ if(!n||n.t==='end'){S.link=false;return toast('Selecione primeiro o bloco de origem (o Fim não tem saída).')}
+ S.link=!S.link;refresh();if(S.link)toast('Agora clique no bloco de destino.');
+};
+$('#clr').onclick=()=>{if(S.nodes.length&&confirm('Apagar todo o fluxograma?')){commit();reset();draw();fit()}};
+$('#mnu').onclick=()=>$('#aside').classList.toggle('open');
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+ document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id==='t-'+b.dataset.tab));
+});
+
+/* Paleta com dicas */
+const tip=$('#tip');
+Object.keys(T).forEach(t=>{
+ const b=document.createElement('button');b.dataset.t=t;b.textContent=T[t].ic+' '+T[t].n;
+ b.onclick=()=>fromPalette(t);
+ b.onpointerenter=()=>{
+  const r=b.dataset.r;tip.innerHTML=`<b>${T[t].ic} ${T[t].n}</b><br>${T[t].ex}`+(r?`<br><em>🔒 ${r}</em>`:'');
+  tip.style.display='block';const q=b.getBoundingClientRect();
+  tip.style.left=Math.max(8,Math.min(q.right+8,innerWidth-tip.offsetWidth-8))+'px';
+  tip.style.top=Math.min(q.top,innerHeight-tip.offsetHeight-8)+'px';
+ };
+ b.onpointerleave=()=>tip.style.display='none';
+ $('#pal').appendChild(b);
+});
+
+/* Geradores */
+function fromText(txt){
+ const steps=txt.split(/->|→|;|\n|\.\s|,|\s(?:depois|em seguida|então)\s/i).map(s=>s.replace(/^\s*(primeiro|depois|então|por fim|e)\s+/i,'').trim()).filter(s=>s.length>2);
+ if(!steps.length)return toast('Escreva o processo primeiro.');
+ const isEnd=s=>/^(fim|finaliz|encerr|conclu)/i.test(s),isDec=s=>/\?|^(verificar|checar|conferir) se /i.test(s),isSt=s=>/^in[ií]cio/i.test(s);
+ const seq=[];if(!isSt(steps[0]))seq.push({t:'start',s:'Início'});
+ steps.forEach(s=>seq.push(isEnd(s)?{t:'end',s:cap(s)}:isDec(s)?{t:'decision',s:cap(s.replace(/^(verificar|checar|conferir) se /i,'').replace(/\?*$/,'?'))}:{t:isSt(s)?'start':'process',s:cap(s)}));
+ if(seq[seq.length-1].t!=='end')seq.push({t:'end',s:'Fim'});
+ commit();reset();
+ const ns=seq.map(q=>add(q.t,q.s,0,0));
+ ns.forEach((n,i)=>{
+  const nx=ns[i+1];if(!nx)return;
+  linkNodes(n.id,nx.id,n.t==='decision'?'SIM':'');
+  if(n.t==='decision'){
+   const c=add('process','Corrigir',0,0);linkNodes(n.id,c.id,'NÃO');
+   const alvo=nx.t==='end'&&i>0?ns[i-1]:nx;linkNodes(c.id,alvo.id,'');
+  }
+ });
+ layout(false);
+}
+function fromSteps(txt){
+ const L=[];txt.split('\n').forEach(l=>{const m=l.match(/^\s*([^:\s]+)\s*:\s*(.+?)(?:\s*->\s*(.+))?\s*$/);if(m)L.push(m)});
+ if(!L.length)return toast('Use o formato  1: Início -> 2');
+ commit();reset();const M={};
+ L.forEach(([,id,tx],i)=>{M[id]=add(/^(fim|finaliz|encerr)/i.test(tx)?'end':tx.includes('?')?'decision':/^subprocesso/i.test(tx)?'sub':i===0?'start':'process',tx,0,0)});
+ L.forEach(([,id,,tg])=>tg&&tg.split(',').forEach(p=>{const [k,l]=p.split(':').map(s=>s.trim());if(M[k])linkNodes(M[id].id,M[k].id,l)}));
+ layout(false);
+}
+$('#bp').onclick=()=>fromText($('#pin').value);
+$('#be').onclick=()=>fromSteps($('#sin').value);
+$('#bx').onclick=()=>{$('#pin').value='Identificar modelo do motor, verificar se o portão está adequado, medir alimentação, definir ponto de instalação, instalar motor, configurar fim de curso, cadastrar controles, testar abertura e fechamento, verificar se o funcionamento está OK, finalizar';fromText($('#pin').value)};
+
+/* Organização em camadas */
+function layout(c=true){
+ if(!S.nodes.length)return;if(c)commit();
+ const N=S.nodes,lv={},st={},back=new Set();N.forEach(n=>lv[n.id]=0);
+ const dfs=id=>{st[id]=1;out(id).forEach(e=>{if(st[e.b]===1)back.add(e.id);else if(!st[e.b])dfs(e.b)});st[id]=2};
+ N.filter(n=>!S.edges.some(e=>e.b===n.id)).concat(N).forEach(n=>{if(!st[n.id])dfs(n.id)});
+ for(let i=0;i<N.length;i++)S.edges.forEach(e=>{if(!back.has(e.id)&&node(e.a)&&node(e.b)&&lv[e.a]+1>lv[e.b])lv[e.b]=lv[e.a]+1});
+ const rows={};N.forEach(n=>(rows[lv[n.id]]=rows[lv[n.id]]||[]).push(n));
+ Object.keys(rows).forEach(k=>rows[k].forEach((n,i)=>{n.x=200+(i-(rows[k].length-1)/2)*220;n.y=70+k*120}));
+ draw();fit();
+}
+$('#lay').onclick=()=>layout();
+
+/* Exportar e importar */
+function dl(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function svgStr(){
+ const [x0,y0,x1,y1]=bb(),w=x1-x0,h=y1-y0,c=$('#world').cloneNode(true);c.removeAttribute('transform');
+ return{w,h,s:`<svg xmlns="${NS}" viewBox="${x0} ${y0} ${w} ${h}" width="${w}" height="${h}"><defs>${$('#defs').innerHTML}</defs><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="#0f172a"/>${c.outerHTML}</svg>`};
+}
+$('#exJ').onclick=()=>dl('fluxo-fenix.json',new Blob([JSON.stringify({app:'FNX-FLU',v:'1.1',nodes:S.nodes,edges:S.edges,nid:S.nid},null,2)],{type:'application/json'}));
+$('#exS').onclick=()=>{if(!S.nodes.length)return toast('Nada para exportar ainda.');dl('fluxo-fenix.svg',new Blob([svgStr().s],{type:'image/svg+xml'}))};
+$('#exP').onclick=()=>{
+ if(!S.nodes.length)return toast('Nada para exportar ainda.');
+ const {w,h,s}=svgStr(),i=new Image();
+ i.onload=()=>{const c=document.createElement('canvas');c.width=w*2;c.height=h*2;const x=c.getContext('2d');x.scale(2,2);x.drawImage(i,0,0,w,h);c.toBlob(b=>dl('fluxo-fenix.png',b))};
+ i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s);
+};
+$('#imJ').onclick=()=>$('#fil').click();
+$('#fil').onchange=ev=>{
+ const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const o=JSON.parse(r.result);if(!Array.isArray(o.nodes)||!Array.isArray(o.edges))throw 0;commit();load(JSON.stringify(o));fit()}catch(e){toast('Arquivo inválido: use um JSON exportado pelo FNX-FLU.')}};
+ r.readAsText(f);ev.target.value='';
+};
+
+/* Início */
+try{const sv=localStorage.getItem(K);if(sv)load(sv)}catch(e){}
+draw();fit();
+</script>
+</body>
+</html>
